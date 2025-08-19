@@ -40,7 +40,11 @@
 
 Large language models (LLMs) have increasingly been employed in social science research. A common workflow involves three stages: (1) fine-tuning pre-trained LLMs on domain-specific datasets to improve performance on specialized tasks, (2) using the fine-tuned models to extract latent variables or classify text data, and (3) incorporating these outputs as outcomes or covariates in downstream statistical inference.
 
-However, this approach ignores uncertainty quantification in the LLM output estimations, potentially leading to invalid statistical inference. This is especially problematic because fine-tuning on small, domain-specific datasets, while necessary for task alignment, often produces overconfident predictions. The limited size of typical annotation datasets (often hundreds or thousands of examples) relative to the model's billions of parameters creates conditions where models memorize training patterns and become artificially overconfident about unseen cases.
+However, this approach ignores uncertainty quantification in the LLM output estimations, leading to invalid statistical inference. 
+As shown in Appendix \ref{appendix:llm_inference}, ignoring fine-tuning uncertainty creates bias in estimation and prediction as well as invalid inference. 
+This is especially problematic because fine-tuning on small, domain-specific datasets, while necessary for task alignment, often produces overconfident predictions. 
+The limited size of typical annotation datasets (often hundreds or thousands of examples) 
+relative to the model's billions of parameters creates conditions where models memorize training patterns and become artificially overconfident about unseen cases.
 
 In this research, we propose a framework that properly accounts for uncertainty from LLM fine-tuning in downstream statistical inference. Our approach jointly estimates LLM fine-tuning parameters and statistical model parameters within a Bayesian framework, rather than the conventional three-stage approach that treats LLM outputs as deterministic point estimates. Specifically, we obtain posterior distributions over fine-tuning parameters using tractable approximations, then propagate this uncertainty to statistical models, ensuring valid statistical inference. \hl{(We don't have a solution yet)}
 
@@ -63,7 +67,7 @@ p(z_i|x_i, D_{train}) = \int p(z_i|x_i, W_0 + \theta_{LoRA})p(\theta_{LoRA}|D_{t
 
 This posterior predictive distribution properly reflects uncertainty from the fine-tuning process, providing calibrated feature representations that account for the limited size of domain-specific training data.
 
-\subsection{Inference with LLM outputs: As Covariates}
+\subsection{Case A: Inference with LLM Outputs Used as Covariates}
 
 We first consider the case where LLM outputs are used as covariates in downstream statistical models. When covariates are measured with error, this leads to attenuation bias—coefficient estimates are biased toward zero—if errors are independent of the input data and can result in underestimating the true effects of LLM-derived variables on outcomes of interest. However, this classical measurement error framework does not apply to fine-tuned LLMs, where prediction errors systematically depend on the training dataset used for fine-tuning. Fine-tuning on small, domain-specific datasets often creates overconfidence issues that lead to systematic prediction biases rather than independent measurement errors. The resulting measurement error violates the independence assumption, meaning bias can occur in either direction depending on how the limited training data relates to the broader application domain.
 
@@ -85,7 +89,7 @@ The joint inferential target:
 
 This joint posterior properly accounts for uncertainty propagation from fine-tuning through to statistical inference, enabling valid statistical inferences that reflect the true uncertainty in LLM-derived measurements.
 
-\subsection{Inference with LLM outputs: As Outcomes}
+\subsection{Case B: Inference with LLM outputs Used as Outcomes}
 
 We next consider the alternative case where LLM-generated measures serve as dependent variables in statistical models. Under classical assumptions, where measurement errors are independent of the regressors and mean-zero, errors in the dependent variable do not bias regression coefficients but do inflate the residual variance, leading to larger standard errors and reduced statistical power. However, this classical framework is often violated when LLMs are used as predictive instruments for outcomes. Fine-tuned LLMs, especially those trained on limited or domain-specific data, may exhibit systematic errors that correlate with the input variables or vary in structure across contexts. These violations can introduce endogeneity-like concerns, resulting in biased coefficient estimates and invalid inference. In particular, biased or structured prediction errors from LLMs may confound the relationship between covariates and outcomes, undermining the reliability of statistical conclusions drawn from such models.
 
@@ -143,7 +147,8 @@ Zhang, J., Xue, W., Yu, Y., and Tan, Y. (2025).
 \newpage
 \appendix
 
-\section{Bias and Inference Issues of Ignoring Fine-Tuning Uncertainty}
+\section{Inference Issues of Ignoring Fine-Tuning Uncertainty}
+\label{appendix:llm_inference}
 
 The LLM output uncertainty comes from two sources: (i) baseline uncertainty, reflecting errors inherent in the pre-trained model $f_{LLM}(x_i; W_0)$, and (ii) fine-tuning uncertainty, reflecting the variability induced by adapting to a small domain-specific dataset.
 
@@ -155,27 +160,116 @@ With this simplification, we write the observed LLM-derived surrogate as $\tilde
 
 For example, suppose $z_i$ is the true stance of a political text, and the fine-tuned LLM was trained on a small, imbalanced dataset with mostly liberal examples. Then the fine-tuned model tends to systematically ``over-predict'' liberal stance, especially for borderline cases. In this case, the fine-tuning error $u_i$ is larger (and systematically biased) when $z_i$ is conservative, $\text{Cov}(u_i, z_i) \neq 0$. Similarly, if a structured covariate $Q_i$ captures demographic attributes (e.g., age or region) that affect writing style, fine-tuning errors may be larger for certain groups, leading to $\text{Cov}(u_i, Q_i) \neq 0$. Finally, if the same unobserved factors affect both the downstream regression and misclassification by the LLM, then $\text{Cov}(u_i, \epsilon_i) \neq 0$.
 
-We now examine the statistical consequences of ignoring this uncertainty in downstream regression analysis. We use the residual-maker $M_Q = I - Q(Q'Q)^{-1}Q'$ to partial-out $Q$. For any vector $v$, denote $\dot{v} = M_Q v$.
 
-\subsection{LLM outputs used as covariates}
+\subsection{Case A: Inference with LLM Outputs Used as Covariates}
 
-True model: $Y_i = z_i^T\gamma + Q_i^T\beta + \epsilon_i$, $E[\epsilon_i|z_i, Q_i] = 0$.
-
-But we regress on $\tilde{z}_i$ (and $Q_i$), ignoring uncertainty in $\tilde{z}_i$. First, we apply the residual maker to all variables:
-\begin{itemize}
-\item $\dot{z} = M_Q\tilde{z}$ (LLM outputs after partialling out $Q$),
-\item $z^* = M_Q z$ (true values after partialling out $Q$),
-\item $\dot{u} = M_Q u$ (error after partialling out $Q$),
-\item $\dot{\epsilon} = M_Q \epsilon$ (regression errors after partialling out $Q$).
-\end{itemize}
-
-The OLS estimator for $\gamma$: $\hat{\gamma} = (\dot{z}'\dot{z})^{-1}\dot{z}'\tilde{Y}$, where $\tilde{Y} = \gamma z^* + \dot{\epsilon}$. By substituting the true model:
+We now examine the statistical consequences of ignoring this uncertainty in downstream regression analysis.
+Consider the true model follows:
 \begin{equation}
-\hat{\gamma} = ((z^* + \dot{u})'(z^* + \dot{u}))^{-1}(z^* + \dot{u})'(\gamma z^* + \dot{\epsilon}).
+Y_i = z_i^T\gamma + Q_i^T\beta + \epsilon_i, \quad E[\epsilon_i|z_i, Q_i] = 0
+\end{equation}
+where $z_i$ represents the latent construct of interest extracted from text $x_i$, $Q_i$ denotes covariates, and $Y_i$ is the outcome variable.
+In practice, researchers observe the noisy LLM output $\tilde{z}_i = z_i + u_i$ and
+estimate the model using $\tilde{z}_i$ in place of the unobserved true values $z_i$, ignoring the uncertainty in the fine-tuning process.
+
+
+To analyze the bias introduced by this substitution, we employ the residual maker $M_Q = I - Q(Q'Q)^{-1}Q'$ to partial out the covariates. 
+Let $\dot{z} = M_Q\tilde{z}$, $z^* = M_Q z$, $\dot{u} = M_Q u$, and $\dot{\epsilon} = M_Q \epsilon$ denote the variables after partialling out $Q$. The OLS estimator for $\gamma$ becomes:
+\begin{equation}
+\hat{\gamma} = (\dot{z}'\dot{z})^{-1}\dot{z}'\dot{Y}
+\end{equation}
+where $\dot{Y} = \gamma z^* + \dot{\epsilon}$ represents the true model after transformation.
+
+Substituting the relationship $\dot{z} = z^* + \dot{u}$ into the OLS formula yields:
+\begin{equation}
+\hat{\gamma} = \frac{(z^* + \dot{u})'(\gamma z^* + \dot{\epsilon})}{(z^* + \dot{u})'(z^* + \dot{u})}
 \end{equation}
 
-\subsection{LLM outputs used as outcomes}
+The numerator expands to $\gamma (z^*)' z^* + (z^*)' \dot{\epsilon} + \gamma \dot{u}' z^* + \dot{u}' \dot{\epsilon}$, while the denominator becomes $(z^*)' z^* + 2(z^*)' \dot{u} + \dot{u}' \dot{u}$. Taking probability limits and applying the exogeneity assumption $\text{Cov}(z^*, \dot{\epsilon}) = 0$, we obtain:
+\begin{equation}
+\text{plim } \hat{\gamma} = \gamma \cdot \frac{\text{Var}(z^*) + \text{Cov}(z^*, \dot{u})}{\text{Var}(z^*) + \text{Var}(\dot{u}) + 2\text{Cov}(z^*, \dot{u})} + \frac{\text{Cov}(\dot{u}, \dot{\epsilon})}{\text{Var}(\dot{z})} \tag{A1}
+\end{equation}
 
-[The mathematical derivation would continue here following the same pattern from the original document]
+This result reveals several important deviations from classical measurement error, with consequences for both estimation and inference.
+
+\textbf{Biased coefficient estimates:} The classical measurement error assumes $u \perp (z, Q, \epsilon)$ with $E[u] = 0$,
+yielding the attenuation bias:
+\begin{equation}
+\text{plim } \hat{\gamma} = \gamma \cdot \frac{\text{Var}(z^*)}{\text{Var}(z^*) + \text{Var}(\dot{u})} \in (0,1) \cdot \gamma \quad \text{(attenuation)} \tag{A2}
+\end{equation}
+
+However, this classical case rarely applies to fine-tuned LLMs due to two key violations. 
+Structured measurement error occurs when $\text{Cov}(z^*, \dot{u}) \neq 0$—arising from overconfident 
+patterns learned from small training datasets—causing the bias in equation (A1) to be either upward or downward. 
+Endogeneity-type correlation emerges when LLM errors correlate with the regression error ($\text{Cov}(\dot{u}, \dot{\epsilon}) \neq 0$), 
+where the second term in equation (A1) introduces additional bias that compounds the measurement error problem.
+
+\textbf{Invalid standard errors and confidence intervals:} Standard OLS procedures treat $\dot{z}$ as fixed regressors and construct confidence intervals 
+around the pseudo-true limit in equation (A1) rather than the true parameter $\gamma$. 
+This creates two distinct problems: (1) confidence intervals center around the biased probability limit from equation (A1)
+rather than the true parameter $\gamma$, leading to systematic mis-coverage; and (2) variance underestimation,
+where the variance calculations omit first-stage uncertainty from LLM fine-tuning.
+
+\textbf{Biased point predictions:} Plug-in predictions $\hat{Y}_i = \hat{\gamma} \tilde{z}_i + Q_i'\hat{\beta}$ 
+suffer from two sources of bias: coefficient bias, where predictions inherit the bias in $\hat{\gamma}$ from equation (A1),
+and input bias, where the systematic distortion in $\tilde{z}_i$
+(using noisy LLM outputs instead of true values) further distorts predictions. 
+The combined effect yields systematically biased mean predictions, with the direction (upward or downward bias)
+depending on the sign of the bias in equation (A1).
+
+\textbf{Invalid prediction intervals:} 
+Standard prediction intervals ignore LLM uncertainty and use only the residual variance $\sigma^2$. 
+However, the correct conditional predictive variance includes additional uncertainty terms. 
+Starting from the true model $Y_i = \gamma z_i + Q_i'\beta + \epsilon_i$ and substituting $z_i = \tilde{z}_i - u_i$, 
+we get $Y_i = \gamma\tilde{z}_i + Q_i'\beta - \gamma u_i + \epsilon_i$. The conditional variance becomes:
+\begin{equation}
+\text{Var}(Y_i | Q_i, \tilde{z}_i) = \sigma^2 + \gamma^2\text{Var}(u_i | x_i, D_{train}) + 2\gamma \text{Cov}(u_i, \epsilon_i | Q_i, \tilde{z}_i) \tag{A3}
+\end{equation}
+where we use $\text{Var}(u_i | x_i, D_{train})$ because LLM measurement error depends on the text input and fine-tuning dataset rather than the covariates. 
+The three components represent: the usual regression error variance ($\sigma^2$), 
+additional uncertainty from LLM measurement error ($\gamma^2\text{Var}(u_i | x_i, D_{train})$), 
+and cross-correlation between measurement error and regression error ($2\gamma \text{Cov}(u_i, \epsilon_i)$). 
+Omitting these components produces prediction intervals that are systematically too narrow, 
+leading to overconfident predictions about future outcomes.
+
+\subsection{Case B: LLM Outputs Used as Outcomes}
+
+Consider next the case where LLM-derived measures serve as dependent variables. The latent structural relationship is:
+\begin{equation}
+z_i = Q_i'\beta + \epsilon_i, \quad E[\epsilon_i | Q_i] = 0
+\end{equation}
+where researchers observe $\hat{z}_i = z_i + u_i$ and estimate the model by regressing $\hat{z}_i$ on $Q_i$. The resulting OLS estimator satisfies:
+\begin{equation}
+\hat{\beta} = \beta + (Q'Q)^{-1}Q'u
+\end{equation}
+which converges in probability to:
+\begin{equation}
+\text{plim } \hat{\beta} = \beta + (E[Q_i Q_i'])^{-1} E[Q_i u_i] \tag{B1}
+\end{equation}
+
+\textbf{Biased coefficient estimates.} This expression reveals that coefficient bias depends entirely on whether fine-tuning errors correlate with the covariates. When $E[Q_i u_i] \neq 0$—for instance, when fine-tuning errors systematically depend on observable features correlated with $Q_i$—the estimator becomes biased according to equation (B1). For a single regressor, this simplifies to:
+\begin{equation}
+\text{plim } \hat{\beta} = \beta + \frac{\text{Cov}(Q, u)}{\text{Var}(Q)} \tag{B2}
+\end{equation}
+
+\textbf{Invalid standard errors and confidence intervals.} Even when coefficient estimates remain unbiased ($E[Q_i u_i] = 0$), 
+the regression errors become $\epsilon_i + u_i$ because we observe $\hat{z}_i = z_i + u_i$ instead of the true $z_i$, 
+so the LLM measurement error $u_i$ appears as additional noise in the residuals alongside the structural error $\epsilon_i$. 
+This creates two opposing effects on confidence intervals: the observed residual variance 
+inflates to $\text{Var}(\epsilon_i + u_i) = \text{Var}(\epsilon_i) + \text{Var}(u_i) + 2\text{Cov}(\epsilon_i, u_i)$ (making intervals wider), 
+while standard error calculations treat $\hat{z}_i$ as fixed data rather than estimates with uncertainty,
+omitting the additional variance component $\text{Var}(\hat{\beta} | \hat{z})$ that accounts for first-stage estimation (making intervals narrower). 
+The net effect on coverage depends on whether $\text{Var}(u_i) + 2\text{Cov}(\epsilon_i, u_i)$ outweighs the ignored first-stage uncertainty,
+but likely results in invalid inference due to centering around the wrong target and incorrect variance estimation.
+
+\textbf{Biased predictions.} When $\text{Cov}(Q_i, u_i) \neq 0$, the coefficient estimates are biased according to equation (B1), 
+so predictions of the true latent construct are systematically biased: $E[\hat{z}_j | Q_j] - E[z_j | Q_j] = Q_j'(E[Q_i Q_i'])^{-1} E[Q_i u_i]$, 
+where the magnitude and direction of bias depend on both the covariate values $Q_j$ and the correlation structure between LLM errors and covariates.
+
+\textbf{Invalid prediction intervals.} Standard procedures use the residual variance 
+$\text{Var}(\epsilon_i + u_i) = \text{Var}(\epsilon_i) + \text{Var}(u_i) + 2\text{Cov}(\epsilon_i, u_i)$ 
+rather than the true latent variance $\text{Var}(\epsilon_i)$, producing prediction intervals 
+for the latent construct $z_i$ that overestimate uncertainty when $\text{Cov}(\epsilon_i, u_i) = 0$ due 
+to the additional measurement error variance $\text{Var}(u_i)$.
 
 \end{document}
