@@ -68,13 +68,14 @@ The limited size of typical annotation datasets (often hundreds or thousands of 
 relative to the model's billions of parameters creates conditions where models memorize training patterns and
 become artificially overconfident about unseen cases \citep{lin2022teaching}.
 
-To illustrate the problem, consider a researcher using a fine-tuned LLM to measure political sentiment from social media posts, 
-then using these measures as covariates in a regression predicting voting behavior. 
+To illustrate the problem, consider a researcher using a fine-tuned LLM to measure political stance 
+from social media posts, then using these measures as covariates in a regression predicting voting behavior. 
 If the LLM was fine-tuned on a small dataset with predominantly liberal examples, 
-it will systematically overpredict liberal sentiment, especially for ambiguous posts. 
-This creates correlated measurement error that biases coefficient estimates away from zero, 
-invalidates standard errors, and produces prediction intervals that are systematically too narrow, 
-leading to overconfident predictions about voting outcomes.
+it will systematically overpredict liberal stance, 
+especially for conservative or ambiguous posts. 
+This creates negatively correlated measurement error where errors are 
+larger for conservative content, leading to biased coefficient estimates, 
+invalid standard errors, and overconfident predictions about voting outcomes.
 
 In this research, we propose a framework that properly accounts for uncertainty 
 from LLM fine-tuning in downstream statistical inference. 
@@ -368,7 +369,7 @@ and cross-correlation between measurement error and regression error ($2\gamma \
 Omitting these components produces prediction intervals that are systematically too narrow, 
 leading to overconfident predictions about future outcomes.
 
-\subsection{Empirical Examples of Fine-Tuning Bias}
+\subsection{Case A: Empirical Examples of Fine-Tuning Bias}
 
 For example, suppose $z_i$ is the true stance of a political text, 
 and the fine-tuned LLM was trained on a small, imbalanced dataset with mostly liberal examples. 
