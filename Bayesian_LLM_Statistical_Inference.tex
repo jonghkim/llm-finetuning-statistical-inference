@@ -380,6 +380,8 @@ $\text{Cov}(u_i, z_i) \neq 0$. Similarly, if a structured covariate $Q_i$ captur
 leading to $\text{Cov}(u_i, Q_i) \neq 0$.
 Finally, if the same unobserved factors affect both the downstream regression and misclassification by the LLM, 
 then $\text{Cov}(u_i, \varepsilon_i) \neq 0$.
+These violate the independence assumptions of classical measurement error, 
+causing bias that can amplify rather than attenuate coefficient estimates.
 
 \subsection{Case B: LLM Outputs as Outcomes}  
 
