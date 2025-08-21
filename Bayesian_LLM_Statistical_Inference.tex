@@ -267,11 +267,13 @@ Zhang, J., Xue, W., Yu, Y., and Tan, Y. (2023).
 \newpage
 \appendix
 
-\section{Inference Issues of Ignoring Fine-Tuning Uncertainty}
+\section{Consequences of Ignoring LLM Uncertainty Quantification}
 \label{appendix:llm_inference}
 
 \subsection{Sources of LLM Uncertainty}
-The LLM output uncertainty comes from two sources: (i) baseline uncertainty, reflecting errors inherent in the pre-trained model $f_{\text{LLM}}(x_i; W_0)$, and (ii) fine-tuning uncertainty, reflecting the variability induced by adapting to a small domain-specific dataset.
+The LLM output uncertainty comes from two sources: (i) baseline uncertainty, reflecting errors inherent in the pre-trained model $f_{\text{LLM}}(x_i; W_0)$, 
+and (ii) fine-tuning uncertainty,
+reflecting the variability induced by adapting to a small domain-specific dataset.
 
 Let the latent construct of interest (e.g., sentiment, topic proportion, policy position) be denoted by $z_i$. When we apply a pre-trained LLM with parameters $W_0$ to text $x_i$, we obtain an approximation $z_i^{(0)} = f_{\text{LLM}}(x_i; W_0) = z_i + u_i^{(0)}$, where $u_i^{(0)}$ represents baseline error from the pre-trained model. After fine-tuning with LoRA on a small domain dataset $D_{\text{train}}$, we obtain $\tilde{z}_i = f_{\text{LLM}}(x_i; W_0 + \theta_{\text{LoRA}}) = z_i^{(0)} + u_i^{(ft)} = z_i + u_i^{(0)} + u_i^{(ft)}$, where $u_i^{(ft)}$ captures fine-tuning uncertainty.
 
@@ -284,7 +286,9 @@ This violation of classical measurement error assumptions leads to four distinct
 biased coefficient estimates, invalid standard errors and confidence intervals, biased point predictions, and invalid prediction intervals.
 We analyze these issues separately for each case below.
 
-\subsection{Case A: LLM Outputs as Covariates}
+\subsection{Inference Issues of Ignoring Fine-Tuning Uncertainty}
+
+\subsubsection{Case A: LLM Outputs as Covariates}
 
 We now examine the statistical consequences of ignoring this uncertainty in downstream regression analysis.
 Consider the true model follows:
@@ -354,23 +358,7 @@ and cross-correlation between measurement error and regression error ($2\gamma \
 Omitting these components produces prediction intervals that are systematically too narrow, 
 leading to overconfident predictions about future outcomes.
 
-\subsection{Empirical Examples of Fine-Tuning Bias}
-
-For example, suppose $z_i$ is the true stance of a political text, 
-and the fine-tuned LLM was trained on a small, imbalanced dataset with mostly liberal examples. 
-A researcher then uses these LLM-predicted stance measures as covariates in a regression predicting voting behavior ($Y_i$), 
-such as whether individuals vote for conservative candidates. 
-The fine-tuned model tends to systematically over-predict liberal stance, 
-especially for borderline cases. In this case, the fine-tuning error $u_i$ is larger (and systematically biased) 
-when $z_i$ is conservative, $\text{Cov}(u_i, z_i) \neq 0$. 
-Similarly, if a structured covariate $Q_i$ captures demographic attributes (e.g., age or region) that affect writing style, 
-fine-tuning errors may be larger for certain groups, leading to $\text{Cov}(u_i, Q_i) \neq 0$. 
-Finally, if the same unobserved factors affect both the downstream regression and misclassification by the LLM, 
-then $\text{Cov}(u_i, \varepsilon_i) \neq 0$. 
-These violate the independence assumptions of classical measurement error, 
-causing bias that can amplify rather than attenuate coefficient estimates.
-
-\subsection{Case B: LLM Outputs as Outcomes}  
+\subsubsection{Case B: LLM Outputs as Outcomes}  
 
 Consider next the case where LLM-derived measures serve as dependent variables. The latent structural relationship is:
 \begin{equation}
@@ -410,5 +398,20 @@ rather than the true latent variance $\text{Var}(\varepsilon_i)$, producing pred
 for the latent construct $z_i$ that overestimate uncertainty when $\text{Cov}(\varepsilon_i, u_i) = 0$ due 
 to the additional measurement error variance $\text{Var}(u_i)$.
 
+\subsection{Empirical Examples of Fine-Tuning Bias}
+
+For example, suppose $z_i$ is the true stance of a political text, 
+and the fine-tuned LLM was trained on a small, imbalanced dataset with mostly liberal examples. 
+A researcher then uses these LLM-predicted stance measures as covariates in a regression predicting voting behavior ($Y_i$), 
+such as whether individuals vote for conservative candidates. 
+The fine-tuned model tends to systematically over-predict liberal stance, 
+especially for borderline cases. In this case, the fine-tuning error $u_i$ is larger (and systematically biased) 
+when $z_i$ is conservative, $\text{Cov}(u_i, z_i) \neq 0$. 
+Similarly, if a structured covariate $Q_i$ captures demographic attributes (e.g., age or region) that affect writing style, 
+fine-tuning errors may be larger for certain groups, leading to $\text{Cov}(u_i, Q_i) \neq 0$. 
+Finally, if the same unobserved factors affect both the downstream regression and misclassification by the LLM, 
+then $\text{Cov}(u_i, \varepsilon_i) \neq 0$. 
+These violate the independence assumptions of classical measurement error, 
+causing bias that can amplify rather than attenuate coefficient estimates.
 
 \end{document}
