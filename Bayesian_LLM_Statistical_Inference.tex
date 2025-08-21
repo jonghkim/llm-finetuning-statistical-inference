@@ -21,6 +21,7 @@
 \usepackage{xcolor}
 \usepackage{soul}
 \usepackage{setspace}
+\usepackage{subcaption} % For side-by-side figures
 
 \doublespacing
 
@@ -54,9 +55,25 @@ A key advantage of our approach is that it enables joint estimation of fine-tuni
 
 \subsection{LLM Output with Uncertainty Quantification}
 
-Fine-tuning pre-trained LLMs often employs parameter-efficient methods like Low-Rank Adaptation (LoRA) \citep{hu2022lora}. Standard LoRA fine-tuning proceeds as follows: the pre-trained weights of LLM, $W_0$, are adapted using low-rank decomposition $W = W_0 + BA$ where $B \in \mathbb{R}^{m \times r}$ and $A \in \mathbb{R}^{r \times n}$ with rank $r \ll \min(m, n)$. During fine-tuning, only the LoRA parameters $\theta_{LoRA} = [A, B]$ are optimized on a domain-specific dataset $D_{train} = \{(x_i, y_i)\}_{i=1}^N$ to obtain point estimates $\hat{A}, \hat{B}$. The fine-tuned model is then applied deterministically for feature extraction: $z_i = f_{LLM}(x_i; W_0 + \hat{B}\hat{A})$ where $D_{text} = \{x_i\}_{i=1}^n$ is raw text data and $z_i \in \mathbb{R}^d$.
+We focus specifically on uncertainty arising from the fine-tuning stage rather than the pre-training uncertainty inherent in the base LLM.
+Pre-training uncertainty is essentially unidentifiable without access to the massive training corpus,
+while fine-tuning uncertainty is both tractable and often dominates when adapting to small domain datasets
+\citep{kong2020calibrating, yang2023bayesian, xiong2024llms}. 
+Unlike pre-training on vast unlabeled corpora, fine-tuning involves limited labeled data, 
+and the immense capacity of LLMs can lead to overfitting and overconfident predictions on these small datasets \citep{kong2020calibrating, lin2022teaching}. 
 
-However, this approach ignores uncertainty in the fine-tuning parameters, particularly problematic when fine-tuning on small datasets. Bayesian fine-tuning \citep{yang2023bayesian, wang2024blob} addresses this by characterizing the full posterior distribution over parameters:
+Fine-tuning pre-trained LLMs often employs parameter-efficient methods like Low-Rank Adaptation (LoRA) \citep{hu2022lora}. 
+This overconfidence is particularly pronounced in parameter-efficient methods like LoRA 
+when applied to domain-specific datasets with limited examples \citep{yang2023bayesian, wang2024blob}.
+
+Standard LoRA fine-tuning proceeds as follows: the pre-trained weights of LLM, $W_0$, are adapted using low-rank decomposition $W = W_0 + BA$ where $B \in \mathbb{R}^{m \times r}$ and $A \in \mathbb{R}^{r \times n}$ with rank $r \ll \min(m, n)$. 
+During fine-tuning, only the LoRA parameters $\theta_{LoRA} = [A, B]$ are optimized on a domain-specific dataset $D_{train} = \{(x_i, y_i)\}_{i=1}^N$ to obtain point estimates $\hat{A}, \hat{B}$. 
+The fine-tuned model is then applied deterministically for feature extraction: $z_i = f_{LLM}(x_i; W_0 + \hat{B}\hat{A})$ where $D_{text} = \{x_i\}_{i=1}^n$ is raw text data and $z_i \in \mathbb{R}^d$.
+
+However, this approach ignores uncertainty in the fine-tuning parameters, 
+particularly problematic when fine-tuning on small datasets. 
+Bayesian fine-tuning \citep{yang2023bayesian, wang2024blob} addresses this by characterizing 
+the full posterior distribution over parameters:
 \begin{equation}
 p(\theta_{LoRA}|D_{train}) \propto p(D_{train}|\theta_{LoRA}, W_0)p(\theta_{LoRA})
 \end{equation}
@@ -65,7 +82,26 @@ where $p(D_{train}|\theta_{LoRA}, W_0)$ is the likelihood of the fine-tuning dat
 p(z_i|x_i, D_{train}) = \int p(z_i|x_i, W_0 + \theta_{LoRA})p(\theta_{LoRA}|D_{train})d\theta_{LoRA}
 \end{equation}
 
-This posterior predictive distribution properly reflects uncertainty from the fine-tuning process, providing calibrated feature representations that account for the limited size of domain-specific training data.
+This posterior predictive distribution properly reflects uncertainty from the fine-tuning process, 
+providing calibrated feature representations that account for the limited size of 
+domain-specific training data.
+
+\begin{figure}[h]
+\centering
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{images/case1_diagram.png}
+    \caption{Case A: LLM outputs as covariates}
+    \label{fig:case1}
+\end{subfigure}
+\hfill
+\begin{subfigure}[b]{0.48\textwidth}
+    \includegraphics[width=\textwidth]{images/case2_diagram.png}
+    \caption{Case B: LLM outputs as outcomes}
+    \label{fig:case2}
+\end{subfigure}
+\caption{Overview of the two cases of LLM uncertainty propagation in statistical inference}
+\label{fig:both_cases}
+\end{figure}
 
 \subsection{Case A: Inference with LLM Outputs Used as Covariates}
 
@@ -141,6 +177,22 @@ Wang, Y., Shi, H., Han, L., Metaxas, D., and Wang, H. (2024).
 Zhang, J., Xue, W., Yu, Y., and Tan, Y. (2025).
 \newblock Debiasing ml-or ai-generated regressors in partial linear models.
 \newblock Available at SSRN 4636026.
+
+\bibitem[Kong et~al.(2020)]{kong2020calibrating}
+Kong, L., d'Autume, C.~D., Ling, W., Yu, L., Dai, Z., and Yogatama, D. (2020).
+\newblock A mutual information maximization perspective of language representation learning.
+\newblock {\em International Conference on Learning Representations}.
+
+\bibitem[Xiong et~al.(2024)]{xiong2024llms}
+Xiong, M., Hu, Z., Lu, X., Li, Y., Fu, J., He, J., and Hooi, B. (2024).
+\newblock Can llms express their uncertainty? an empirical evaluation of confidence elicitation in llms.
+\newblock {\em The Twelfth International Conference on Learning Representations}.
+
+\bibitem[Lin et~al.(2022)]{lin2022teaching}
+Lin, S., Hilton, J., and Evans, O. (2022).
+\newblock Teaching models to express their uncertainty in words.
+\newblock {\em arXiv preprint arXiv:2205.14334}.
+\newblock \url{https://arxiv.org/abs/2205.14334}
 
 \end{thebibliography}
 
