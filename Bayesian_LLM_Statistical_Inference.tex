@@ -358,45 +358,143 @@ and cross-correlation between measurement error and regression error ($2\gamma \
 Omitting these components produces prediction intervals that are systematically too narrow, 
 leading to overconfident predictions about future outcomes.
 
+
+\subsubsection{Case A: LLM Outputs as Covariates}
+
+We now show the statistical consequences of ignoring this uncertainty in downstream regression analysis.
+Consider the true model:
+\begin{equation}
+Y_i = z_i^\top\gamma + Q_i^\top\beta + \varepsilon_i,\qquad \mathbb{E}[\varepsilon_i \mid z_i,Q_i]=0,
+\end{equation}
+where $z_i$ represents the latent construct of interest extracted from text $x_i$, $Q_i$ denotes covariates, and $Y_i$ is the outcome variable.
+In practice, researchers observe the noisy LLM output $\tilde z_i = z_i + u_i$ and estimate the model using $\tilde z_i$ in place of the unobserved true values $z_i$, ignoring the uncertainty in the fine-tuning process.
+
+\paragraph{Notation and residualization.}
+To analyze the bias introduced by this substitution, we employ the residual maker $M_Q = I - Q(Q^\top Q)^{-1}Q^\top$ to partial out the covariates (assume $Q$ has full column rank).
+For clarity, we first present the single-covariate case ($d=1$); the multivariate generalization follows analogously.
+Let $\dot z = M_Q \tilde z$, $z^\ast = M_Q z$, $\dot u = M_Q u$, and $\dot\varepsilon = M_Q \varepsilon$ denote the variables after partialling out $Q$.
+The OLS estimator for $\gamma$ becomes:
+\begin{equation}
+\hat\gamma = (\dot z^\top \dot z)^{-1}\, \dot z^\top \dot Y,
+\end{equation}
+where $\dot Y = \gamma\, z^\ast + \dot\varepsilon$ is the residualized model.
+
+Substituting $\dot z = z^\ast + \dot u$ yields
+\begin{equation}
+\hat\gamma = \frac{(z^\ast + \dot u)^\top(\gamma z^\ast + \dot\varepsilon)}{(z^\ast + \dot u)^\top(z^\ast + \dot u)}.
+\end{equation}
+The numerator expands to $\gamma (z^\ast)^\top z^\ast + (z^\ast)^\top \dot\varepsilon + \gamma\, \dot u^\top z^\ast + \dot u^\top \dot\varepsilon$, while the denominator becomes $(z^\ast)^\top z^\ast + 2(z^\ast)^\top \dot u + \dot u^\top \dot u$.
+Taking probability limits and using $\operatorname{Cov}(z^\ast,\dot\varepsilon)=0$, we obtain
+\begin{equation}
+\operatorname{plim}\,\hat\gamma = \gamma \cdot
+\frac{\operatorname{Var}(z^\ast) + \operatorname{Cov}(z^\ast,\dot u)}
+{\operatorname{Var}(z^\ast) + \operatorname{Var}(\dot u) + 2\,\operatorname{Cov}(z^\ast,\dot u)}
++
+\frac{\operatorname{Cov}(\dot u,\dot\varepsilon)}{\operatorname{Var}(\dot z)}.
+\tag{A1}\label{eq:A1}
+\end{equation}
+
+This result reveals several important deviations from classical measurement error, with consequences for both estimation and inference.
+
+\paragraph{Biased coefficient estimates.}
+Under classical measurement error, $u \perp (z,Q,\varepsilon)$ and $\mathbb{E}[u]=0$, yielding the attenuation bias
+\begin{equation}
+\operatorname{plim}\,\hat\gamma
+=
+\gamma \cdot \frac{\operatorname{Var}(z^\ast)}{\operatorname{Var}(z^\ast) + \operatorname{Var}(\dot u)}
+\in (0,1)\cdot \gamma.
+\tag{A2}
+\end{equation}
+However, fine-tuned LLMs typically violate these assumptions.
+Structured measurement error arises when $\operatorname{Cov}(z^\ast,\dot u)\neq 0$ (e.g., overconfident patterns learned from small training data), so the bias in \eqref{eq:A1} can be upward or downward.
+Endogeneity-type correlation emerges when LLM errors correlate with the regression error, $\operatorname{Cov}(\dot u,\dot\varepsilon)\neq 0$, introducing the second bias term in \eqref{eq:A1}.
+
+\paragraph{Invalid standard errors and confidence intervals.}
+Standard OLS treats $\dot z$ as fixed and centers intervals at the pseudo-true limit in \eqref{eq:A1} rather than the true $\gamma$, causing systematic mis-coverage.
+Moreover, variance is generally misspecified (often underestimated) because first-stage uncertainty from fine-tuning is ignored.
+
+\paragraph{Biased point predictions.}
+Plug-in predictions $\hat Y_i = \hat\gamma\, \tilde z_i + Q_i^\top \hat\beta$ suffer from (i) coefficient bias inherited from \eqref{eq:A1} and (ii) input bias due to using $\tilde z_i$ in place of $z_i$.
+The net direction depends on the sign and magnitude of the biases in \eqref{eq:A1}.
+
+\paragraph{Invalid prediction intervals.}
+Starting from $Y_i=\gamma z_i + Q_i^\top\beta + \varepsilon_i$ and substituting $z_i=\tilde z_i - u_i$, we obtain
+$Y_i = \gamma \tilde z_i + Q_i^\top \beta - \gamma u_i + \varepsilon_i$.
+Thus,
+\begin{equation}
+\operatorname{Var}(Y_i \mid Q_i,\tilde z_i)
+=
+\sigma^2
++
+\gamma^2\,\operatorname{Var}\!\big(u_i \mid x_i, D_{\text{train}}\big)
+\boldsymbol{-}
+2\gamma\,\operatorname{Cov}\!\big(u_i,\varepsilon_i \mid Q_i,\tilde z_i\big).
+\tag{A3}
+\end{equation}
+We model $u_i$ as driven by $(x_i, D_{\text{train}})$, so we use $\operatorname{Var}(u_i \mid x_i, D_{\text{train}})$ to reflect fine-tuning uncertainty rather than conditioning on $Q_i$.
+Omitting these components yields intervals that are systematically too narrow and overconfident.
+
 \subsubsection{Case B: LLM Outputs as Outcomes}  
 
 Consider next the case where LLM-derived measures serve as dependent variables. The latent structural relationship is:
 \begin{equation}
-z_i = Q_i'\beta + \varepsilon_i, \quad E[\varepsilon_i | Q_i] = 0
+z_i = Q_i^\top \beta + \varepsilon_i, \quad \mathbb{E}[\varepsilon_i \mid Q_i] = 0,
 \end{equation}
-where researchers observe $\hat{z}_i = z_i + u_i$ and estimate the model by regressing $\hat{z}_i$ on $Q_i$. The resulting OLS estimator satisfies:
+where researchers observe $\hat{z}_i = z_i + u_i$ and estimate the model by regressing $\hat{z}_i$ on $Q_i$.  
+The resulting OLS estimator is
 \begin{equation}
-\hat{\beta} = \beta + (Q'Q)^{-1}Q'u
+\hat{\beta} = (Q^\top Q)^{-1}Q^\top \hat{z} 
+= \beta + (Q^\top Q)^{-1}Q^\top \varepsilon + (Q^\top Q)^{-1}Q^\top u. 
 \end{equation}
-which converges in probability to:
+Taking probability limits and applying $\mathbb{E}[Q_i \varepsilon_i]=0$, we obtain
 \begin{equation}
-\text{plim } \hat{\beta} = \beta + (E[Q_i Q_i'])^{-1} E[Q_i u_i] \tag{B1}
+\operatorname{plim}\,\hat{\beta} 
+= \beta + \big(\mathbb{E}[Q_i Q_i^\top]\big)^{-1}\mathbb{E}[Q_i u_i]. 
+\tag{B1}\label{eq:B1}
 \end{equation}
 
-\textbf{Biased coefficient estimates.} This expression reveals that coefficient bias depends entirely on whether fine-tuning errors correlate with the covariates. When $E[Q_i u_i] \neq 0$—for instance, when fine-tuning errors systematically depend on observable features correlated with $Q_i$—the estimator becomes biased according to equation (B1). For a single regressor, this simplifies to:
+\textbf{Biased coefficient estimates.}  
+Expression \eqref{eq:B1} shows that coefficient bias depends entirely on whether fine-tuning errors correlate with the covariates.  
+When $\mathbb{E}[Q_i u_i] \neq 0$—for instance, when fine-tuning errors systematically depend on observable features correlated with $Q_i$—the estimator becomes biased.  
+For a single regressor, this simplifies to:
 \begin{equation}
-\text{plim } \hat{\beta} = \beta + \frac{\text{Cov}(Q, u)}{\text{Var}(Q)} \tag{B2}
+\operatorname{plim}\,\hat{\beta} 
+= \beta + \frac{\operatorname{Cov}(Q,u)}{\operatorname{Var}(Q)}.
+\tag{B2}\label{eq:B2}
 \end{equation}
 
-\textbf{Invalid standard errors and confidence intervals.} Even when coefficient estimates remain unbiased ($E[Q_i u_i] = 0$), 
-the regression errors become $\varepsilon_i + u_i$ because we observe $\hat{z}_i = z_i + u_i$ instead of the true $z_i$, 
-so the LLM measurement error $u_i$ appears as additional noise in the residuals alongside the structural error $\varepsilon_i$. 
-This creates two opposing effects on confidence intervals: the observed residual variance 
-inflates to $\text{Var}(\varepsilon_i + u_i) = \text{Var}(\varepsilon_i) + \text{Var}(u_i) + 2\text{Cov}(\varepsilon_i, u_i)$ (making intervals wider), 
-while standard error calculations treat $\hat{z}_i$ as fixed data rather than estimates with uncertainty,
-omitting the additional variance component $\text{Var}(\hat{\beta} | \hat{z})$ that accounts for first-stage estimation (making intervals narrower). 
-The net effect on coverage depends on whether $\text{Var}(u_i) + 2\text{Cov}(\varepsilon_i, u_i)$ outweighs the ignored first-stage uncertainty,
-but likely results in invalid inference due to centering around the wrong target and incorrect variance estimation.
+\textbf{Invalid standard errors and confidence intervals.}  
+Even when coefficient estimates remain unbiased ($\mathbb{E}[Q_i u_i]=0$), the regression residuals become $\varepsilon_i+u_i$ because $\hat{z}_i=z_i+u_i$.  
+Thus, the variance of residuals inflates to
+\[
+\operatorname{Var}(\varepsilon_i+u_i) 
+= \operatorname{Var}(\varepsilon_i) + \operatorname{Var}(u_i) + 2\,\operatorname{Cov}(\varepsilon_i,u_i),
+\]
+making intervals wider if treated correctly.  
+However, standard OLS formulas treat $\hat{z}_i$ as fixed rather than estimated with uncertainty, omitting the additional variance component 
+$\operatorname{Var}(\hat{\beta}\mid \hat{z})$ that accounts for first-stage estimation.  
+The net effect on coverage depends on whether $\operatorname{Var}(u_i)+2\operatorname{Cov}(\varepsilon_i,u_i)$ outweighs the ignored first-stage variance,  
+but in general intervals are invalid because they are centered at a biased limit or computed with a misspecified variance.
 
-\textbf{Biased predictions.} When $\text{Cov}(Q_i, u_i) \neq 0$, the coefficient estimates are biased according to equation (B1), 
-so predictions of the true latent construct are systematically biased: $E[\hat{z}_j | Q_j] - E[z_j | Q_j] = Q_j'(E[Q_i Q_i'])^{-1} E[Q_i u_i]$, 
-where the magnitude and direction of bias depend on both the covariate values $Q_j$ and the correlation structure between LLM errors and covariates.
+\textbf{Biased predictions.}  
+When $\operatorname{Cov}(Q_i,u_i)\neq 0$, coefficient estimates are biased according to \eqref{eq:B1}, so predictions of the latent construct are systematically shifted.  
+Formally,
+\[
+\mathbb{E}[\hat{z}_j \mid Q_j] - \mathbb{E}[z_j \mid Q_j] 
+= Q_j^\top \big(\mathbb{E}[Q_i Q_i^\top]\big)^{-1}\mathbb{E}[Q_i u_i],
+\]
+which represents the asymptotic prediction bias under the linear-projection interpretation.  
+More generally, prediction bias equals $\mathbb{E}[u_j \mid Q_j]$.
 
-\textbf{Invalid prediction intervals.} Standard procedures use the residual variance 
-$\text{Var}(\varepsilon_i + u_i) = \text{Var}(\varepsilon_i) + \text{Var}(u_i) + 2\text{Cov}(\varepsilon_i, u_i)$ 
-rather than the true latent variance $\text{Var}(\varepsilon_i)$, producing prediction intervals 
-for the latent construct $z_i$ that overestimate uncertainty when $\text{Cov}(\varepsilon_i, u_i) = 0$ due 
-to the additional measurement error variance $\text{Var}(u_i)$.
+\textbf{Invalid prediction intervals.}  
+Standard procedures use the inflated residual variance 
+\[
+\operatorname{Var}(\varepsilon_i+u_i) 
+= \operatorname{Var}(\varepsilon_i) + \operatorname{Var}(u_i) + 2\,\operatorname{Cov}(\varepsilon_i,u_i)
+\]
+instead of the true latent variance $\operatorname{Var}(\varepsilon_i)$.  
+This produces prediction intervals for the latent construct $z_i$ that overstate or misstate uncertainty, depending on the sign of $\operatorname{Cov}(\varepsilon_i,u_i)$.  
+When $\operatorname{Cov}(\varepsilon_i,u_i)=0$, intervals systematically overestimate uncertainty due to the extra $\operatorname{Var}(u_i)$ term.
 
 \subsection{Empirical Examples of Fine-Tuning Bias}
 
